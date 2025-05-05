@@ -1,18 +1,15 @@
-using BackendAPI.Controllers;
+using BackendAPI.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.Identity.Web;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-
 builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Add authentication with Azure AD
+// Add authentication middleware
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -34,18 +31,19 @@ builder.Services.Configure<AzureAdOptions>(builder.Configuration.GetSection("Azu
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+app.UseRouting();
 
 app.UseAuthentication();
 
 app.UseAuthorization();
+
+app.UseHttpsRedirection();
 
 app.MapControllers();
 
