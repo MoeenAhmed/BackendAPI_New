@@ -23,7 +23,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidAudience = $"{builder.Configuration["AzureAd:Audience"]}",
             ValidateIssuerSigningKey = true,
             ValidateLifetime = true,
-            ClockSkew = TimeSpan.FromHours(1)
+            ClockSkew = TimeSpan.FromMinutes(5)
         };
     });
 
