@@ -1,5 +1,6 @@
 ﻿using Azure.Core;
 using BackendAPI.Models;
+using BackendAPI.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -16,62 +17,36 @@ namespace BackendAPI.Controllers
     [ApiController]
     public class UsersController : ControllerBase
     {
-        private readonly AzureAdOptions _azureAdOptions;
-        public UsersController(IOptions<AzureAdOptions> azureAdOptions)
+        private readonly IUserService _userService;
+        private readonly IAuthService _authService;
+        public UsersController(IUserService userService, IAuthService authService)
         {
-            _azureAdOptions = azureAdOptions.Value;
+            _userService = userService;
+            _authService = authService;
         }
 
         [Authorize]
         [HttpGet("GetUserInfo")]
         public async Task<IActionResult> GetUserInfo(string authCode)
         {
-            APIResponse<object> response = new APIResponse<object>();
+            APIResponse<User?> response = new APIResponse<User?>();
 
             try
             {
-                string authToken = await ExchangeAuthCodeWithTokenAsync(authCode);
+                string authToken = await _authService.ExchangeAuthCodeWithTokenAsync(authCode);
 
-                using (var client = new HttpClient())
-                {
-                    client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", authToken);
-                    var result = await client.GetAsync("https://graph.microsoft.com/v1.0/me");
+                if (string.IsNullOrEmpty(authToken))
+                    throw new Exception("Token exchange failed");
 
-                    if (result.IsSuccessStatusCode)
-                    {
-                        response.Status = "Success";
-                        response.Message = "User info fetched successfully.";
-                        response.Data = JsonConvert.DeserializeObject<User>(await result.Content.ReadAsStringAsync());
-                        return Ok(response);
-                    }
-                    else
-                    {
-                        response.Status = "Failure";
-                        response.Message = "User info fetching failed";
-                        response.Data = await result.Content.ReadAsStringAsync();
-                        return BadRequest(response);
-                    }
-                }
+                var user = await _userService.GetUserInfo(authToken);
+
+                return Ok(new APIResponse<User?>("Success", "User info fetched successfully.", user));
+                
             }
             catch (Exception ex)
             {
-                response.Status = "Exception";
-                response.Message = $"{ex.Message}";
-                response.Data = null;
-                return BadRequest(response);
+                return BadRequest(new APIResponse<string>("Exception", "Exception occured while generating the token", ex.Message));
             }
-        }
-
-        private async Task<string> ExchangeAuthCodeWithTokenAsync(string authCode)
-        {
-            var cca = ConfidentialClientApplicationBuilder.Create(_azureAdOptions.ClientId)
-                   .WithClientSecret(_azureAdOptions.ClientSecret)
-                   .WithRedirectUri(_azureAdOptions.CallbackUrl)
-                   .WithAuthority(new Uri($"https://login.microsoftonline.com/{_azureAdOptions.TenantId}"))
-                   .Build();
-
-            var authenticationResult = await cca.AcquireTokenByAuthorizationCode(_azureAdOptions.Scopes, authCode).ExecuteAsync();
-            return authenticationResult.AccessToken;
         }
     }
 }

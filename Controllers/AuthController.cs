@@ -1,4 +1,5 @@
 ﻿using BackendAPI.Models;
+using BackendAPI.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
@@ -13,9 +14,11 @@ namespace BackendAPI.Controllers
     public class AuthController : ControllerBase
     {
         private readonly AzureAdOptions _azureAdOptions;
-        public AuthController(IOptions<AzureAdOptions> azureAdOptions)
+        private readonly IAuthService _authService;
+        public AuthController(IOptions<AzureAdOptions> azureAdOptions, IAuthService authService)
         {
             _azureAdOptions = azureAdOptions.Value;
+            _authService = authService;
         }
 
         [HttpGet("GetAccessToken")]
@@ -25,33 +28,14 @@ namespace BackendAPI.Controllers
 
             try
             {
-                using (var client = new HttpClient())
-                {
-                    var parameters = new Dictionary<string, string>
-                    {
-                        ["client_id"] = $"{_azureAdOptions.ClientId}",
-                        ["client_secret"] = $"{_azureAdOptions.ClientSecret}",
-                        ["grant_type"] = "client_credentials",
-                        ["resource"] = $"{_azureAdOptions.ClientId}"
-                    };
-
-                    var result = await client.PostAsync($"https://login.microsoftonline.com/{_azureAdOptions.TenantId}/oauth2/token", new FormUrlEncodedContent(parameters));
-
-                    result.EnsureSuccessStatusCode();
-
-                    var responseBody = await result.Content.ReadAsStringAsync();
-                    
-                    var jsonResponse = JObject.Parse(responseBody);
-                    
-                    var accessToken = jsonResponse["access_token"].ToString();
-
-                    return Ok(new APIResponse<string>("Success", "Token generated successfully.", accessToken));
-                };
+                var accessToken = await _authService.GetAccessTokenAsync();
+                return Ok(new APIResponse<string>("Success", "Token generated successfully.", accessToken));
             }
             catch (Exception ex)
             {
-                return BadRequest(new APIResponse<string>("Failed", "Exception occured while generating the token", ex.Message));
+                return BadRequest(new APIResponse<string>("Exception", "Exception occured while generating the token", ex.Message));
             }
         }
+
     }
 }
